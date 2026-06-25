@@ -1,0 +1,230 @@
+# Oracle Database Free with Docker and Spring Boot
+
+## 1. Start Oracle Database in Docker
+
+### Pull Oracle Database Free Image
+
+```bash
+docker pull container-registry.oracle.com/database/free:latest
+```
+
+### Create a Persistent Volume
+
+```bash
+docker volume create oracle-data
+```
+
+### Run Oracle Container
+
+```bash
+docker run -d \
+  --name oracle-free \
+  -p 1521:1521 \
+  -p 5500:5500 \
+  -e ORACLE_PWD=Oracle123 \
+  -v oracle-data:/opt/oracle/oradata \
+  container-registry.oracle.com/database/free:latest
+```
+
+### Verify Container Status
+
+```bash
+docker ps
+```
+
+### Check Database Startup Logs
+
+```bash
+docker logs -f oracle-free
+```
+
+Wait until you see:
+
+```text
+DATABASE IS READY TO USE!
+```
+
+---
+
+## 2. Verify Oracle Database
+
+Connect to the database:
+
+```bash
+docker exec -it oracle-free sqlplus system/Oracle123@FREEPDB1
+```
+
+List available pluggable databases:
+
+```sql
+SHOW PDBS;
+```
+
+Expected output:
+
+```text
+FREEPDB1
+```
+
+---
+
+## 3. Spring Boot Configuration
+
+### application.properties
+
+```properties
+spring.datasource.url=jdbc:oracle:thin:@//localhost:1521/FREEPDB1
+spring.datasource.username=system
+spring.datasource.password=Oracle123
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+
+spring.jpa.database-platform=org.hibernate.dialect.OracleDialect
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=none
+```
+
+> Replace `Oracle123` with the password used in the `ORACLE_PWD` environment variable when the container was created.
+
+---
+
+## 4. Maven Dependency
+
+```xml
+<dependency>
+    <groupId>com.oracle.database.jdbc</groupId>
+    <artifactId>ojdbc11</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+
+For Spring Boot 3 and Java 17+, `ojdbc11` is recommended.
+
+---
+
+## 5. Gradle Dependency
+
+```gradle
+runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
+```
+
+---
+
+## 6. Test Connection
+
+Create a simple repository:
+
+```java
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+}
+```
+
+Start the application:
+
+```bash
+./gradlew bootRun
+```
+
+or
+
+```bash
+mvn spring-boot:run
+```
+
+Expected logs:
+
+```text
+HikariPool-1 - Start completed.
+```
+
+No Oracle connection errors should appear.
+
+---
+
+## 7. Useful Docker Commands
+
+### Stop Database
+
+```bash
+docker stop oracle-free
+```
+
+### Start Database
+
+```bash
+docker start oracle-free
+```
+
+### Restart Database
+
+```bash
+docker restart oracle-free
+```
+
+### View Logs
+
+```bash
+docker logs -f oracle-free
+```
+
+### Open SQL*Plus
+
+```bash
+docker exec -it oracle-free sqlplus system/Oracle123@FREEPDB1
+```
+
+### Remove Container
+
+```bash
+docker rm -f oracle-free
+```
+
+### Remove Image
+
+```bash
+docker rmi container-registry.oracle.com/database/free:latest
+```
+
+---
+
+## Troubleshooting
+
+### Cannot connect to Docker daemon
+
+Start Docker Desktop and verify:
+
+```bash
+docker ps
+```
+
+### ORA-12514: Listener does not currently know of service requested
+
+Verify available services:
+
+```bash
+docker exec -it oracle-free lsnrctl status
+```
+
+Ensure the service name is:
+
+```text
+FREEPDB1
+```
+
+and the JDBC URL is:
+
+```properties
+spring.datasource.url=jdbc:oracle:thin:@//localhost:1521/FREEPDB1
+```
+
+### Invalid Username or Password
+
+Verify the password used during container creation:
+
+```bash
+docker history
+```
+
+or recreate the container with a known password.
+
+---
